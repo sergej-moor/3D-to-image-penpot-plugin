@@ -47,8 +47,8 @@ penpot.on("selectionchange", () => {
 });
 
 penpot.ui.open("Selection Viewer", `?theme=${penpot.theme}`, {
-  width: 464,
-  height: 500,
+  width: 800,
+  height: 800,
 });
 
 // Handle messages from UI
