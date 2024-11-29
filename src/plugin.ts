@@ -11,23 +11,22 @@ async function sendSelection() {
     return;
   }
 
-  const selection = penpot.selection[0];
-
-  // Debug logs
-  console.log("Selection object:", selection);
-  console.log("Selection properties:", Object.keys(selection));
-  console.log("Selection export method:", selection.export);
-  console.log("Selection prototype:", Object.getPrototypeOf(selection));
-
-  penpot.ui.sendMessage({
-    type: "selectionchange",
-    selection: {
+  // Send all selections with position data
+  const selections = await Promise.all(
+    penpot.selection.map(async (selection) => ({
       name: selection.name,
       width: selection.width,
       height: selection.height,
       type: selection.type,
       id: selection.id,
-    },
+      x: selection.x,
+      y: selection.y,
+    }))
+  );
+
+  penpot.ui.sendMessage({
+    type: "selectionchange",
+    selection: selections,
   });
 }
 
@@ -57,24 +56,30 @@ penpot.ui.onMessage(
     if (message.type === "ready") {
       sendSelection();
     } else if (message.type === "export-selection") {
-      const selection = penpot.selection[0];
-      if (selection) {
-        try {
-          const imageData = await selection.export({
-            type: "png",
-            scale: 2,
-          });
+      try {
+        // Export all selections
+        const exports = await Promise.all(
+          penpot.selection.map(async (selection) => {
+            const imageData = await selection.export({
+              type: "png",
+              scale: 2,
+            });
+            return {
+              imageData: Array.from(imageData),
+              width: selection.width,
+              height: selection.height,
+              x: selection.x,
+              y: selection.y,
+            };
+          })
+        );
 
-          // Send the raw Uint8Array data
-          penpot.ui.sendMessage({
-            type: "export-result",
-            imageData: Array.from(imageData), // Convert to regular array for serialization
-            width: selection.width,
-            height: selection.height,
-          });
-        } catch (error) {
-          console.error("Error exporting shape:", error);
-        }
+        penpot.ui.sendMessage({
+          type: "export-result",
+          exports: exports,
+        });
+      } catch (error) {
+        console.error("Error exporting shapes:", error);
       }
     } else if (message.type === "add-capture" && message.imageData) {
       const blockId = penpot.history.undoBlockBegin();

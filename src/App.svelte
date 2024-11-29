@@ -9,7 +9,7 @@
     height: number;
     type: string;
     id: string;
-  } | undefined>(undefined);
+  }[] | undefined>(undefined);
 
   let sceneComponent: any;
   let isLoading = $state(false);
@@ -23,12 +23,8 @@
         updateTheme(event.data.theme);
         break;
       case event.data.type === "export-result":
-        if (sceneComponent) {
-          sceneComponent.displayImageData(
-            event.data.imageData,
-            selection?.width || 0,
-            selection?.height || 0
-          );
+        if (sceneComponent && event.data.exports) {
+          sceneComponent.displayMultipleImages(event.data.exports);
           isLoading = false;
         }
         break;
@@ -61,7 +57,7 @@
 
 <main data-theme={$theme}>
   <h1>Selection Viewer</h1>
-  {#if selection}
+  {#if selection && selection.length > 0}
     <div class="button-container">
       <button 
         on:click={handleExport} 
@@ -71,7 +67,7 @@
         {#if isLoading}
           Loading Preview...
         {:else}
-          Load Preview
+          Load Preview ({selection.length} items)
         {/if}
       </button>
       <button 

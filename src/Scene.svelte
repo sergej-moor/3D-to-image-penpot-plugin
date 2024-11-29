@@ -9,7 +9,9 @@
     height: number;
     type: string;
     id: string;
-  } | undefined;
+    x: number;
+    y: number;
+  }[] | undefined;
 
   export let isLoading: boolean;
 
@@ -18,7 +20,7 @@
   let camera: THREE.PerspectiveCamera;
   let renderer: THREE.WebGLRenderer;
   let controls: OrbitControls;
-  let imagePlane: THREE.Mesh;
+  let imagePlanes: THREE.Mesh[] = [];
 
   onMount(() => {
     initThreeJS();
@@ -69,54 +71,82 @@
     renderer.render(scene, camera);
   }
 
-  export const displayImageData = (imageData: number[], width: number, height: number) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  export const displayMultipleImages = (exports: { 
+    imageData: number[], 
+    width: number, 
+    height: number,
+    x: number,
+    y: number 
+  }[]) => {
+    // Clear existing planes
+    imagePlanes.forEach(plane => {
+      scene.remove(plane);
+      plane.geometry.dispose();
+      plane.material.dispose();
+    });
+    imagePlanes = [];
 
-    canvas.width = width * 2;
-    canvas.height = height * 2;
+    // Find the center point of all elements
+    const bounds = exports.reduce((acc, exp) => {
+      acc.minX = Math.min(acc.minX, exp.x);
+      acc.maxX = Math.max(acc.maxX, exp.x + exp.width);
+      acc.minY = Math.min(acc.minY, exp.y);
+      acc.maxY = Math.max(acc.maxY, exp.y + exp.height);
+      return acc;
+    }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
 
-    const uint8Array = new Uint8Array(imageData);
-    const blob = new Blob([uint8Array], { type: 'image/png' });
-    const url = URL.createObjectURL(blob);
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
 
-    const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0);
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.premultiplyAlpha = false;
+    // Create planes for each image at their original positions
+    exports.forEach((exp) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-      // Remove existing plane if it exists
-      if (imagePlane) {
-        scene.remove(imagePlane);
-        imagePlane.geometry.dispose();
-        imagePlane.material.dispose();
-      }
+      canvas.width = exp.width * 2;
+      canvas.height = exp.height * 2;
 
-      // Create plane with transparent material
-      const planeGeometry = new THREE.PlaneGeometry(width, height);
-      const planeMaterial = new THREE.MeshStandardMaterial({ 
-        map: texture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        alphaTest: 0.1,
-      });
-      
-      imagePlane = new THREE.Mesh(planeGeometry, planeMaterial);
-      scene.add(imagePlane);
+      const uint8Array = new Uint8Array(exp.imageData);
+      const blob = new Blob([uint8Array], { type: 'image/png' });
+      const url = URL.createObjectURL(blob);
 
-      // Adjust camera to fit object
-      const aspectRatio = width / height;
-      const distance = Math.max(width, height) * 2;
-      camera.position.z = distance;
-      controls.target.set(0, 0, 0);
-      controls.update();
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.premultiplyAlpha = false;
 
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
+        const planeGeometry = new THREE.PlaneGeometry(exp.width, exp.height);
+        const planeMaterial = new THREE.MeshStandardMaterial({ 
+          map: texture,
+          transparent: true,
+          side: THREE.DoubleSide,
+          alphaTest: 0.1,
+        });
+        
+        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        
+        // Position relative to center, and flip Y coordinate (Penpot Y grows down, Three.js Y grows up)
+        plane.position.x = exp.x - centerX + (exp.width / 2);
+        plane.position.y = -(exp.y - centerY + (exp.height / 2));
+        
+        scene.add(plane);
+        imagePlanes.push(plane);
+
+        // Update camera position to fit all elements
+        const width = bounds.maxX - bounds.minX;
+        const height = bounds.maxY - bounds.minY;
+        const distance = Math.max(width, height) * 1.2;
+        camera.position.z = distance;
+        controls.target.set(0, 0, 0);
+        controls.update();
+
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    });
   };
 
   export const captureView = async () => {
