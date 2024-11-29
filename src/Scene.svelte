@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import * as THREE from 'three';
   import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+  import { selectionsStore } from './stores/selections';
+  import SelectionControls from './SelectionControls.svelte';
 
   export let selection: {
     name: string;
@@ -21,6 +23,18 @@
   let renderer: THREE.WebGLRenderer;
   let controls: OrbitControls;
   let imagePlanes: THREE.Mesh[] = [];
+
+  let selectionControls: Array<{
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+  }> = [];
+
+  $: if (selection) {
+    selectionControls = selection;
+    selectionsStore.initialize(selection);
+  }
 
   onMount(() => {
     initThreeJS();
@@ -78,6 +92,9 @@
     renderer.render(scene, camera);
   }
 
+  // Add a constant for z-index scaling
+  const Z_INDEX_SCALE = 20; // Adjust this value to make depth changes more/less pronounced
+
   export const displayMultipleImages = (exports: { 
     imageData: number[], 
     width: number, 
@@ -106,7 +123,7 @@
     const centerY = (bounds.minY + bounds.maxY) / 2;
 
     // Create planes for each image at their original positions
-    exports.forEach((exp) => {
+    exports.forEach((exp, index) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -141,6 +158,13 @@
         // Position relative to center, and flip Y coordinate (Penpot Y grows down, Three.js Y grows up)
         plane.position.x = exp.x - centerX + (exp.width / 2);
         plane.position.y = -(exp.y - centerY + (exp.height / 2));
+        
+        // Subscribe to z-index changes
+        const unsubscribe = selectionsStore.subscribe(state => {
+          if (state[selection![index].id]) {
+            plane.position.z = state[selection![index].id].zIndex * Z_INDEX_SCALE;
+          }
+        });
         
         scene.add(plane);
         imagePlanes.push(plane);
@@ -184,21 +208,41 @@
   };
 </script>
 
-<div class="scene-container" bind:this={container}>
-  {#if !selection}
-    <p class="overlay-text">No selection</p>
-  {:else if isLoading}
-    <div class="overlay">
-      <div class="spinner"></div>
-      <p class="overlay-text">Loading preview...</p>
-    </div>
-  {/if}
+<div class="container">
+  <div class="controls-panel">
+    {#each selectionControls as sel}
+      <SelectionControls selection={sel} />
+    {/each}
+  </div>
+  <div class="scene-container" bind:this={container}>
+    {#if !selection}
+      <p class="overlay-text">No selection</p>
+    {:else if isLoading}
+      <div class="overlay">
+        <div class="spinner"></div>
+        <p class="overlay-text">Loading preview...</p>
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
-  .scene-container {
-    width: 100%;
+  .container {
+    display: flex;
+    gap: 1rem;
     height: 400px;
+  }
+
+  .controls-panel {
+    width: 300px;
+    padding: 1rem;
+    background: var(--background-color, white);
+    border-radius: 8px;
+    overflow-y: auto;
+  }
+
+  .scene-container {
+    flex: 1;
     border-radius: 8px;
     overflow: hidden;
     background-color: #f5f5f5;
