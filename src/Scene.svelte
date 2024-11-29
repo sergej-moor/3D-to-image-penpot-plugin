@@ -40,7 +40,23 @@
     initThreeJS();
     animate();
 
+    const handleResize = () => {
+      if (container) {
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        
+        renderer.setSize(width * window.devicePixelRatio, height * window.devicePixelRatio, false);
+        renderer.setPixelRatio(window.devicePixelRatio);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
     return () => {
+      window.removeEventListener('resize', handleResize);
       renderer?.dispose();
       scene?.clear();
     };
@@ -55,14 +71,15 @@
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 2000);
     camera.position.z = 1000;
 
-    // Renderer setup with alpha
+    // Renderer setup with improved quality
     renderer = new THREE.WebGLRenderer({ 
       antialias: true,
       alpha: true,
-      preserveDrawingBuffer: true
+      preserveDrawingBuffer: true,
+      precision: 'highp',  // High precision rendering
     });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setClearColor(0x000000, 0);
+    renderer.setSize(container.clientWidth * window.devicePixelRatio, container.clientHeight * window.devicePixelRatio, false);
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
@@ -125,11 +142,18 @@
     // Create planes for each image at their original positions
     exports.forEach((exp, index) => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', {
+        alpha: true,
+        willReadFrequently: true,
+      });
       if (!ctx) return;
 
-      canvas.width = exp.width * 2;
-      canvas.height = exp.height * 2;
+      // Double the canvas size for higher resolution textures
+      canvas.width = exp.width * 4;   // Increased multiplier
+      canvas.height = exp.height * 4;  // Increased multiplier
+      
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       const uint8Array = new Uint8Array(exp.imageData);
       const blob = new Blob([uint8Array], { type: 'image/png' });
@@ -137,11 +161,15 @@
 
       const img = new Image();
       img.onload = () => {
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.premultiplyAlpha = false;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();  // Add anisotropic filtering
+        texture.minFilter = THREE.LinearMipmapLinearFilter;  // Better minification filter
+        texture.magFilter = THREE.LinearFilter;  // Better magnification filter
+        texture.generateMipmaps = true;  // Enable mipmapping
 
         const planeGeometry = new THREE.PlaneGeometry(exp.width, exp.height);
         const planeMaterial = new THREE.MeshStandardMaterial({ 
@@ -162,7 +190,10 @@
         // Subscribe to z-index changes
         const unsubscribe = selectionsStore.subscribe(state => {
           if (state[selection![index].id]) {
-            plane.position.z = state[selection![index].id].zIndex * Z_INDEX_SCALE;
+            const selState = state[selection![index].id];
+            plane.position.x = selState.x - centerX + (exp.width / 2);
+            plane.position.y = -(selState.y - centerY + (exp.height / 2));
+            plane.position.z = selState.zIndex * Z_INDEX_SCALE;
           }
         });
         

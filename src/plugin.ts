@@ -62,7 +62,7 @@ penpot.ui.onMessage(
           penpot.selection.map(async (selection) => {
             const imageData = await selection.export({
               type: "png",
-              scale: 2,
+              scale: 4,
             });
             return {
               imageData: Array.from(imageData),

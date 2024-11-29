@@ -4,6 +4,8 @@ type SelectionState = {
   [id: string]: {
     name: string;
     zIndex: number;
+    x: number;
+    y: number;
   };
 };
 
@@ -12,10 +14,17 @@ function createSelectionsStore() {
 
   return {
     subscribe,
-    initialize: (selections: Array<{ id: string; name: string }>) => {
+    initialize: (
+      selections: Array<{ id: string; name: string; x: number; y: number }>
+    ) => {
       const state: SelectionState = {};
       selections.forEach((sel) => {
-        state[sel.id] = { name: sel.name, zIndex: 0 };
+        state[sel.id] = {
+          name: sel.name,
+          zIndex: 0,
+          x: sel.x,
+          y: sel.y,
+        };
       });
       set(state);
     },
@@ -23,6 +32,12 @@ function createSelectionsStore() {
       update((state) => ({
         ...state,
         [id]: { ...state[id], zIndex },
+      }));
+    },
+    updatePosition: (id: string, axis: "x" | "y", value: number) => {
+      update((state) => ({
+        ...state,
+        [id]: { ...state[id], [axis]: value },
       }));
     },
     clear: () => set({}),
