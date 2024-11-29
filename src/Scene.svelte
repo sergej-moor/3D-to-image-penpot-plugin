@@ -33,7 +33,7 @@
   function initThreeJS() {
     // Scene setup
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf5f5f5);
+    scene.background = null;
 
     // Camera setup
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 2000);
@@ -42,10 +42,11 @@
     // Renderer setup with alpha
     renderer = new THREE.WebGLRenderer({ 
       antialias: true,
-      alpha: true 
+      alpha: true,
+      preserveDrawingBuffer: true
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setClearColor(0xf5f5f5, 1);
+    renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
     // Controls
@@ -116,6 +117,30 @@
       URL.revokeObjectURL(url);
     };
     img.src = url;
+  };
+
+  export const captureView = async () => {
+    return new Promise<Uint8Array>((resolve) => {
+      // Clear the background before capture
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      
+      // Render the scene
+      renderer.render(scene, camera);
+      
+      // Get the canvas data
+      const canvas = renderer.domElement;
+      
+      // Convert to blob with alpha channel
+      canvas.toBlob((blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const arrayBuffer = reader.result as ArrayBuffer;
+          resolve(new Uint8Array(arrayBuffer));
+        };
+        reader.readAsArrayBuffer(blob!);
+      }, 'image/png');
+    });
   };
 </script>
 

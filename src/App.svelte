@@ -40,6 +40,16 @@
     window.parent.postMessage({ type: "export-selection" }, "*");
   }
 
+  async function handleCapture() {
+    if (sceneComponent) {
+      const imageData = await sceneComponent.captureView();
+      window.parent.postMessage({ 
+        type: "add-capture", 
+        imageData: imageData 
+      }, "*");
+    }
+  }
+
   onMount(() => {
     window.parent.postMessage({
       type: "ready",
@@ -52,17 +62,26 @@
 <main data-theme={$theme}>
   <h1>Selection Viewer</h1>
   {#if selection}
-    <button 
-      on:click={handleExport} 
-      disabled={isLoading}
-      class:loading={isLoading}
-    >
-      {#if isLoading}
-        Loading Preview...
-      {:else}
-        Load Preview
-      {/if}
-    </button>
+    <div class="button-container">
+      <button 
+        on:click={handleExport} 
+        disabled={isLoading}
+        class:loading={isLoading}
+      >
+        {#if isLoading}
+          Loading Preview...
+        {:else}
+          Load Preview
+        {/if}
+      </button>
+      <button 
+        on:click={handleCapture}
+        class="capture-button"
+        disabled={!selection || isLoading}
+      >
+        Capture View
+      </button>
+    </div>
   {/if}
   <Scene bind:this={sceneComponent} {selection} {isLoading} />
 </main>
@@ -128,6 +147,20 @@
     to {
       transform: translateX(100%);
     }
+  }
+
+  .button-container {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .capture-button {
+    background-color: var(--button-secondary-color, #4a5568);
+  }
+
+  .capture-button:hover:not(:disabled) {
+    background-color: var(--button-secondary-hover-color, #2d3748);
   }
 </style>
 
