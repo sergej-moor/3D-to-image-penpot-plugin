@@ -22,6 +22,8 @@
   "dependencies": {
     "@penpot/plugin-styles": "^1.0.0",
     "@penpot/plugin-types": "^1.0.0",
-    "@types/node": "^22.9.1"
+    "@types/node": "^22.9.1",
+    "@types/three": "^0.170.0",
+    "three": "^0.170.0"
   }
 }
