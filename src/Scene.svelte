@@ -11,6 +11,8 @@
     id: string;
   } | undefined;
 
+  export let isLoading: boolean;
+
   let container: HTMLDivElement;
   let scene: THREE.Scene;
   let camera: THREE.PerspectiveCamera;
@@ -119,25 +121,60 @@
 
 <div class="scene-container" bind:this={container}>
   {#if !selection}
-    <p class="no-selection">No selection</p>
+    <p class="overlay-text">No selection</p>
+  {:else if isLoading}
+    <div class="overlay">
+      <div class="spinner"></div>
+      <p class="overlay-text">Loading preview...</p>
+    </div>
   {/if}
 </div>
 
 <style>
   .scene-container {
     width: 100%;
-    height: 300px;
+    height: 400px;
     border-radius: 8px;
     overflow: hidden;
     background-color: #f5f5f5;
     position: relative;
   }
 
-  .no-selection {
+  .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(245, 245, 245, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    z-index: 10;
+  }
+
+  .overlay-text {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     margin: 0;
+    color: #666;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--button-primary-color, #2c5282);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 </style>
