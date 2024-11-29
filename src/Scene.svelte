@@ -49,6 +49,7 @@
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setClearColor(0x000000, 0);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
     // Controls
@@ -57,12 +58,18 @@
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = true;
 
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    // Improved lighting setup
+    const ambientLight = new THREE.AmbientLight(0xffffff,3);
     scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight.position.set(0, 1, 1);
-    scene.add(directionalLight);
+
+   
+/*     const frontLight = new THREE.DirectionalLight(0xffffff, 1);
+    frontLight.position.set(0, 0, 1);
+    scene.add(frontLight); */
+ 
+    const topLight = new THREE.DirectionalLight(0xffffff, 1);
+    topLight.position.set(0, 1, 0);
+    scene.add(topLight); 
   }
 
   function animate() {
@@ -116,6 +123,7 @@
         ctx.drawImage(img, 0, 0);
         
         const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
         texture.premultiplyAlpha = false;
 
         const planeGeometry = new THREE.PlaneGeometry(exp.width, exp.height);
@@ -124,6 +132,8 @@
           transparent: true,
           side: THREE.DoubleSide,
           alphaTest: 0.1,
+          roughness: 0.2,
+          metalness: 0.0,
         });
         
         const plane = new THREE.Mesh(planeGeometry, planeMaterial);
