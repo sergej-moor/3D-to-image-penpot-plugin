@@ -14,7 +14,7 @@ function createSelectionsStore() {
 
   return {
     subscribe,
-    initialize: (
+    loadSelections: (
       selections: Array<{ id: string; name: string; x: number; y: number }>
     ) => {
       const state: SelectionState = {};

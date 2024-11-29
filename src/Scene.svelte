@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
   import * as THREE from 'three';
   import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
   import { selectionsStore } from './stores/selections';
@@ -24,22 +24,55 @@
   let controls: OrbitControls;
   let imagePlanes: THREE.Mesh[] = [];
 
-  let selectionControls: Array<{
+  let loadedSelections: Array<{
     id: string;
     name: string;
     x: number;
     y: number;
   }> = [];
 
-  $: if (selection) {
-    selectionControls = selection;
-    selectionsStore.initialize(selection);
+  // Add state for original dimensions
+  let originalDimensions = $state<{width: number, height: number} | null>(null);
+
+  // Add these methods to be called from outside
+  export function clearScene() {
+    imagePlanes.forEach(plane => {
+      scene.remove(plane);
+      plane.geometry.dispose();
+      plane.material.dispose();
+    });
+    imagePlanes = [];
+    loadedSelections = [];
+    originalDimensions = null;  // Clear dimensions when clearing scene
+    selectionsStore.clear();
   }
+
+  export function hasLoadedElements(): boolean {
+    return loadedSelections.length > 0;
+  }
+
+  // Make the component available to parent
+  export function getComponent() {
+    return {
+      clearScene,
+      hasLoadedElements,
+      displayMultipleImages,
+      captureView
+    };
+  }
+
+  const dispatch = createEventDispatcher();
 
   onMount(() => {
     initThreeJS();
     animate();
-
+    dispatch('mount', { getComponent: () => ({
+      clearScene,
+      hasLoadedElements,
+      displayMultipleImages,
+      captureView
+    })});
+    
     const handleResize = () => {
       if (container) {
         const width = container.clientWidth;
@@ -123,19 +156,35 @@
     imagePlanes.forEach(plane => {
       scene.remove(plane);
       plane.geometry.dispose();
-      plane.material.dispose();
+      //plane.material.dispose();
     });
     imagePlanes = [];
 
-    // Find the center point of all elements
-    const bounds = exports.reduce((acc, exp) => {
-      acc.minX = Math.min(acc.minX, exp.x);
-      acc.maxX = Math.max(acc.maxX, exp.x + exp.width);
-      acc.minY = Math.min(acc.minY, exp.y);
-      acc.maxY = Math.max(acc.maxY, exp.y + exp.height);
-      return acc;
-    }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+    // Update loadedSelections and initialize store
+    loadedSelections = selection?.map(sel => ({
+      id: sel.id,
+      name: sel.name,
+      x: sel.x,
+      y: sel.y
+    })) || [];
+    
+    selectionsStore.loadSelections(loadedSelections);
 
+    // Calculate the bounds of all elements
+    const bounds = {
+      minX: Math.min(...exports.map(e => e.x)),
+      maxX: Math.max(...exports.map(e => e.x + e.width)),
+      minY: Math.min(...exports.map(e => e.y)),
+      maxY: Math.max(...exports.map(e => e.y + e.height))
+    };
+
+    // Store original dimensions
+    originalDimensions = {
+      width: bounds.maxX - bounds.minX,
+      height: bounds.maxY - bounds.minY
+    };
+
+    // Find the center point of all elements
     const centerX = (bounds.minX + bounds.maxX) / 2;
     const centerY = (bounds.minY + bounds.maxY) / 2;
 
@@ -214,8 +263,27 @@
     });
   };
 
-  export const captureView = async () => {
+  export const captureView = async (): Promise<Uint8Array> => {
     return new Promise<Uint8Array>((resolve) => {
+      if (!originalDimensions) return;
+
+      // Store current camera and renderer settings
+      const originalAspect = camera.aspect;
+      const originalSize = {
+        width: renderer.domElement.width,
+        height: renderer.domElement.height
+      };
+
+      // Set camera and renderer to match original dimensions
+      camera.aspect = originalDimensions.width / originalDimensions.height;
+      camera.updateProjectionMatrix();
+      
+      renderer.setSize(
+        originalDimensions.width,
+        originalDimensions.height,
+        false
+      );
+
       // Clear the background before capture
       renderer.setClearColor(0x000000, 0);
       renderer.clear();
@@ -231,6 +299,17 @@
         const reader = new FileReader();
         reader.onloadend = () => {
           const arrayBuffer = reader.result as ArrayBuffer;
+          
+          // Restore original camera and renderer settings
+          camera.aspect = originalAspect;
+          camera.updateProjectionMatrix();
+          renderer.setSize(
+            originalSize.width,
+            originalSize.height,
+            false
+          );
+          renderer.render(scene, camera);
+
           resolve(new Uint8Array(arrayBuffer));
         };
         reader.readAsArrayBuffer(blob!);
@@ -241,9 +320,13 @@
 
 <div class="container">
   <div class="controls-panel">
-    {#each selectionControls as sel}
-      <SelectionControls selection={sel} />
-    {/each}
+    {#if loadedSelections.length > 0}
+      {#each loadedSelections as sel}
+        <SelectionControls selection={sel} />
+      {/each}
+    {:else}
+      <p class="no-preview">Load preview to enable controls</p>
+    {/if}
   </div>
   <div class="scene-container" bind:this={container}>
     {#if !selection}
@@ -316,5 +399,12 @@
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+
+  .no-preview {
+    color: var(--text-secondary-color, #666);
+    text-align: center;
+    padding: 1rem;
+    font-size: 0.9rem;
   }
 </style>

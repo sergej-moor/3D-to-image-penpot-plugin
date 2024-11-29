@@ -11,7 +11,7 @@
     id: string;
   }[] | undefined>(undefined);
 
-  let sceneComponent: any;
+  let sceneComponent = $state<ReturnType<typeof Scene['prototype']['getComponent']> | undefined>(undefined);
   let isLoading = $state(false);
 
   function handleMessage(event: MessageEvent) {
@@ -24,6 +24,7 @@
         break;
       case event.data.type === "export-result":
         if (sceneComponent && event.data.exports) {
+          //sceneComponent.clearScene();
           sceneComponent.displayMultipleImages(event.data.exports);
           isLoading = false;
         }
@@ -46,6 +47,10 @@
     }
   }
 
+  function handleSceneMount(component: any) {
+    sceneComponent = component.getComponent();
+  }
+
   onMount(() => {
     window.parent.postMessage({
       type: "ready",
@@ -57,12 +62,13 @@
 
 <main data-theme={$theme}>
   <h1>Selection Viewer</h1>
-  {#if selection && selection.length > 0}
-    <div class="button-container">
+  <div class="button-container">
+    {#if selection && selection.length > 0}
       <button 
         on:click={handleExport} 
         disabled={isLoading}
         class:loading={isLoading}
+        class="preview-button"
       >
         {#if isLoading}
           Loading Preview...
@@ -70,16 +76,21 @@
           Load Preview ({selection.length} items)
         {/if}
       </button>
-      <button 
-        on:click={handleCapture}
-        class="capture-button"
-        disabled={!selection || isLoading}
-      >
-        Capture View
-      </button>
-    </div>
-  {/if}
-  <Scene bind:this={sceneComponent} {selection} {isLoading} />
+    {/if}
+    <button 
+      on:click={handleCapture}
+      class="capture-button"
+      disabled={!sceneComponent?.hasLoadedElements() || isLoading}
+    >
+      Capture View
+    </button>
+  </div>
+  <Scene 
+    bind:this={sceneComponent} 
+    {selection} 
+    {isLoading} 
+    on:mount={({ detail }) => handleSceneMount(detail)}
+  />
 </main>
 
 <style>
@@ -149,6 +160,7 @@
     display: flex;
     gap: 1rem;
     margin-bottom: 1rem;
+    align-items: center;
   }
 
   .capture-button {
@@ -157,6 +169,15 @@
 
   .capture-button:hover:not(:disabled) {
     background-color: var(--button-secondary-hover-color, #2d3748);
+  }
+
+  .preview-button {
+    background-color: var(--button-primary-color, #2c5282);
+    min-width: 200px;
+  }
+
+  .preview-button:hover:not(:disabled) {
+    background-color: var(--button-primary-hover-color, #2b6cb0);
   }
 </style>
 
